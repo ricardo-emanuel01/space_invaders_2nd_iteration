@@ -618,7 +618,7 @@ void drawPowerup(Game *game, Entity *powerup) {
     else currentTex = game->textures->movePowerup;
     DrawTexturePro(
         currentTex,
-        game->animation->bulletFrame,
+        game->animation->powerupFrame,
         powerup->bounds,
         origin,
         0.0f,
