@@ -4,7 +4,6 @@
 # include <stdlib.h>
 # include "entity.h"
 # include "raylib.h"
-# include "raymath.h"
 
 
 typedef enum GameState {
@@ -45,10 +44,10 @@ typedef struct ColdGameData {
     float enemyShipSpeed;
     float projectileSpeed;
     float powerupDuration;
-    float animationDuration;
     float hordeSpeedIncrease;
     float hordeStepY;
     float enemyShipSleepTime;
+    float alienTimePerFrame;
 } ColdGameData;
 
 typedef struct HotGameData {
@@ -67,6 +66,7 @@ typedef struct HotGameData {
     bool enemyShipGoingLeft;
     bool enemyShipDefeated;
     bool enemyShipActive;
+    bool shipActive;
 } HotGameData;
 
 typedef struct Sounds {
@@ -99,6 +99,7 @@ typedef struct Animation {
     Rectangle bulletFrame;
     Rectangle enemyShipFrame;
     Rectangle powerupFrame;
+    float timeRemainingToChangeFrame;
     int enemyCurrentFrame;
 } Animation;
 
@@ -114,31 +115,9 @@ typedef struct Game {
     Sounds *sounds;
     Textures *textures;
     Animation *animation;
+    float screenHeight;
+    float screenWidth;
 } Game;
-
-ColdGameData *initColdGameData();
-
-HotGameData *initHotGameData();
-
-void cleanupGameData(ColdGameData *, HotGameData *);
-
-Sounds *initSounds();
-
-void cleanupSounds(Sounds *);
-
-Textures *initTextures();
-
-void cleanupTextures(Textures *);
-
-Animation *initAnimation();
-
-void cleanupAnimation(Animation *);
-
-Game initGame();
-
-void fire(Game *, Entity *);
-
-void detectCollisions(Game *);
 
 void mainLoop();
 

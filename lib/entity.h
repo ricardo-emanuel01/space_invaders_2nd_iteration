@@ -38,7 +38,9 @@ Entity *createEnemyShip();
 
 Entity *createListEntities();
 
-Entity *createHorde(Entity *lastAlive);
+Entity *createHorde();
+
+Entity *findLastAlive(Entity *);
 
 void killEnemy(Entity *enemy);
 

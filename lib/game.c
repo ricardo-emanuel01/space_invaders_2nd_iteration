@@ -5,6 +5,8 @@
 # include "raylib.h"
 
 
+void detectCollisions(Game *);
+
 ColdGameData *initColdGameData() {  
     const float shipSpeeds[] = {300.0f, 450.0f};
     const float shipDelaysToFire[] = {0.5f, 0.1f};
@@ -14,11 +16,11 @@ ColdGameData *initColdGameData() {
     gameData->enemyShipDelayToFire = 0.25f;
     gameData->enemyShipSpeed = 450.0f;
     gameData->projectileSpeed = 600.0f;
-    gameData->powerupDuration = 60.0f;
-    gameData->animationDuration = 0.2f;
-    gameData->hordeSpeedIncrease = 45.0f;
-    gameData->hordeStepY = 50.0f;
+    gameData->powerupDuration = 2.0f;
+    gameData->hordeSpeedIncrease = 100.0f;
+    gameData->hordeStepY = 100.0f;
     gameData->enemyShipSleepTime = 4.0f;
+    gameData->alienTimePerFrame = 0.1f;
     
     memcpy(
         &gameData->shipSpeeds,
@@ -49,13 +51,10 @@ HotGameData *initHotGameData() {
     gameData->shipLastShotTime = 0.0;
     gameData->remainingTimeEnemyShipAlarm = 4.0f;
     gameData->enemyShipLastShotTime = 0.0;
+    gameData->shipActive = true;
+    gameData->input = (Input){.fire=false};
 
     return gameData;
-}
-
-void cleanupGameData(ColdGameData *cold, HotGameData *hot) {
-    free(cold);
-    free(hot);
 }
 
 Sounds *initSounds() {
@@ -121,6 +120,7 @@ Animation *initAnimation() {
     animation->bulletFrame = (Rectangle){.height=8.0f, .width=4.0f, .x=0.0f, .y=0.0f};
     animation->enemyShipFrame = (Rectangle){.height=10.0f, .width=16.0f, .x=0.0f, .y=0.0f};
     animation->powerupFrame = (Rectangle){.height=18.0f, .width=18.0f, .x=0.0f, .y=0.0f};
+    animation->timeRemainingToChangeFrame = 0.1f;
     animation->enemyCurrentFrame = 0;
 
     return animation;
@@ -130,36 +130,25 @@ void cleanupAnimation(Animation *animation) {
     free(animation);
 }
 
-Game initGame() {
-    srand(time(NULL));
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(1920.0f, 1080.0f, "Space Invaders Clone");
-    InitAudioDevice();
-    SetExitKey(KEY_NULL);
-    DisableCursor();
+void initGame(Game *game) {
+    game->ship = createPlayerShip();
+    game->enemyShip = createEnemyShip();
+    game->bullets = createBulletsList();
+    game->powerups = createPowerupsList();
+    game->hotData = initHotGameData();
+    game->coldData = initColdGameData();
+    game->sounds = initSounds();
+    game->textures = initTextures();
+    game->animation = initAnimation();
+    game->horde = createHorde(game->hordeLastAlive);
+    game->hordeLastAlive = findLastAlive(game->horde);
 
-    Game game = {
-        .ship=createPlayerShip(),
-        .enemyShip=createEnemyShip(),
-        .bullets=createBulletsList(),
-        .powerups=createPowerupsList(),
-        .coldData=initColdGameData(),
-        .hotData=initHotGameData(),
-        .sounds=initSounds(),
-        .textures=initTextures(),
-        .animation=initAnimation(),
-    };
-    game.horde = createHorde(game.hordeLastAlive);
-
-    game.sounds->background.looping = true;
-    game.sounds->enemyShip.looping = true;
-    PlayMusicStream(game.sounds->background);
-
-    return game;
+    game->sounds->background.looping = true;
+    game->sounds->enemyShip.looping = true;
+    PlayMusicStream(game->sounds->background);
 }
 
 void cleanupGame(Game *game) {
-    cleanupGameData(game->coldData, game->hotData);
     cleanupSounds(game->sounds);
     cleanupTextures(game->textures);
     cleanupAnimation(game->animation);
@@ -168,8 +157,14 @@ void cleanupGame(Game *game) {
     freeHorde(game->horde);
     freeBullets(game->bullets);
     freePowerups(game->powerups);
-    CloseAudioDevice();
-    CloseWindow();
+    free(game->hotData);
+    free(game->coldData);
+}
+
+void rebootGame(Game *game) {
+    cleanupGame(game);
+    initGame(game);
+    game->hotData->gameState = PLAYING;
 }
 
 void fire(Game *game, Entity *entity) {
@@ -198,19 +193,22 @@ void fire(Game *game, Entity *entity) {
 }
 
 void processInput(Input *input) {
+    float stickX = 0.0f, stickY = 0.0f;
     const float stickDeadzone = 0.1f;
-    float stickX = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
-    if (stickX < stickDeadzone && stickX > -stickDeadzone) stickX = 0.0f;
-    float stickY = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y);
-    if (stickY < stickDeadzone && stickY > -stickDeadzone) stickY = 0.0f;
+    if (IsGamepadAvailable(0)) {
+        stickX = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
+        if (stickX < stickDeadzone && stickX > -stickDeadzone) stickX = 0.0f;
+        stickY = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y);
+        if (stickY < stickDeadzone && stickY > -stickDeadzone) stickY = 0.0f;
+    }
 
     input->up = IsKeyPressed(KEY_UP) || stickY > 0.0f;
     input->down = IsKeyPressed(KEY_DOWN) || stickY < 0.0f;
     input->left = IsKeyDown(KEY_LEFT) || stickX < 0.0f;
     input->right = IsKeyDown(KEY_RIGHT) || stickX > 0.0f;
-    input->fire = IsKeyPressed(KEY_SPACE) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-    input->select = IsKeyPressed(KEY_ENTER) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
-    input->pause = IsKeyPressed(KEY_ESCAPE) || IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT);
+    input->fire = IsKeyPressed(KEY_SPACE) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
+    input->select = IsKeyPressed(KEY_ENTER) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
+    input->pause = IsKeyPressed(KEY_ESCAPE) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT));
 }
 
 void updateShip(Game *game) {
@@ -271,10 +269,18 @@ void updateShip(Game *game) {
 void updateHorde(Game *game) {
     if (game->hotData->gameState == PLAYING) {
         Entity *current = game->horde->next;
-        double delta = GetTime() - game->hotData->lastFrameTime;
+        double now = GetTime();
+        double delta = now - game->hotData->lastFrameTime;
+
+        game->animation->timeRemainingToChangeFrame -= delta;
+        if (game->animation->timeRemainingToChangeFrame < 0.0f) {
+            game->animation->enemyCurrentFrame = (game->animation->enemyCurrentFrame + 1) % 4;
+            game->animation->aliensFrame.x = game->animation->aliensFrame.x + game->animation->aliensFrame.width *  game->animation->enemyCurrentFrame;
+            game->animation->timeRemainingToChangeFrame = game->coldData->alienTimePerFrame;
+        }
+
         bool changeDirection = false;
         float maxMovement;
-    
         if (game->hotData->hordeSpeed > 0.0f) {
             float maxPositionX = current->bounds.x;
             while (current->type != LIST_SENTINEL) {
@@ -307,7 +313,7 @@ void updateHorde(Game *game) {
         }
     
         for (Entity *current = game->horde->next; current->type != LIST_SENTINEL; current = current->next) {
-            int dropCheck = rand() % 100000;
+            int dropCheck = rand() % 1000000;
             if (dropCheck < 10) fire(game, current);
             current->bounds.x += maxMovement;
             
@@ -339,8 +345,8 @@ void updateEnemyShip(Game *game) {
                 enemyShip->bounds.x -= enemyShipMove;
             }
         } else {
-            if (enemyShip->bounds.x + enemyShipMove >= 1920.0f) {
-                enemyShip->bounds.x = 1920.0f;;
+            if (enemyShip->bounds.x + enemyShipMove >= game->screenWidth) {
+                enemyShip->bounds.x = game->screenWidth;
                 game->hotData->enemyShipGoingLeft = true;
                 game->hotData->remainingTimeEnemyShipAlarm = game->coldData->enemyShipSleepTime;
                 game->hotData->enemyShipActive = false;
@@ -363,7 +369,7 @@ void updateProjectiles(Game *game, Entity *projectiles) {
             current->bounds.y += game->coldData->projectileSpeed * delta;
         }
 
-        if ((current->bounds.y > 1080.0f) || (current->bounds.y - current->bounds.height < 0.0f)) {
+        if ((current->bounds.y > game->screenHeight) || (current->bounds.y - current->bounds.height < 0.0f)) {
             Entity *toKill = current;
             current = current->prev;
             killProjectile(toKill);
@@ -414,7 +420,7 @@ void updateGameState(Game *game) {
     if (gameState == WIN || gameState == LOSE) {
         if (game->hotData->input.select) {
             if (game->hotData->menuButton == RESTART) {
-                //rebootGame(game);
+                rebootGame(game);
             } else if (game->hotData->menuButton == QUIT) {
                 game->hotData->gameState = CLOSE;
             }
@@ -427,6 +433,14 @@ void updateGame(Game *game) {
     UpdateMusicStream(game->sounds->background);
 
     if (game->hotData->gameState == PLAYING) {
+        if (game->hordeLastAlive->bounds.y + game->horde->next->bounds.height >= game->ship->bounds.y) {
+            game->hotData->gameState = LOSE;
+            game->hotData->menuButton = RESTART;
+            StopMusicStream(game->sounds->background);
+            PlaySound(game->sounds->lose);
+            game->hotData->shipActive = false;
+        }
+
         detectCollisions(game);
         updateShip(game);
         updateHorde(game);
@@ -489,7 +503,7 @@ void detectCollisions(Game *game) {
                 currentBullet = temp;
                 PlaySound(game->sounds->enemyExplosion);
             } else {
-                if (detectCollision(currentBullet, game->enemyShip)) {
+                if (game->hotData->enemyShipActive && detectCollision(currentBullet, game->enemyShip)) {
                     dropCheck = rand() % 100;
                     if (dropCheck < 15) {
                         generatePowerup(game->powerups, game->enemyShip->bounds.x + game->enemyShip->bounds.width/2.0f, game->enemyShip->bounds.y + game->enemyShip->bounds.height);
@@ -511,6 +525,7 @@ void detectCollisions(Game *game) {
                 killBullet(currentBullet);
                 PlaySound(game->sounds->shipExplosion);
                 PlaySound(game->sounds->lose);
+                game->hotData->shipActive = false;
                 return;
             } else {
                 currentBullet = currentBullet->next;
@@ -539,7 +554,7 @@ void detectCollisions(Game *game) {
 }
 
 void drawShip(Game *game) {
-    if (game->hotData->gameState != LOSE) {
+    if (game->hotData->shipActive) {
         Vector2 origin = {0.0f, 0.0f};
         DrawTexturePro(
             game->textures->ship,
@@ -692,8 +707,8 @@ void drawMenuButtons(Game *game, Rectangle *banner) {
 void drawMenu(Game *game) {
     const float height = 400.0f;
     const float width = 600.0f;
-    const float x = (1920.0f - width)/2.0f;
-    const float y = (1080.0f - height)/2.0f;
+    const float x = (game->screenWidth - width)/2.0f;
+    const float y = (game->screenHeight - height)/2.0f;
     Rectangle banner = {.height=height, .width=width, .x=x, .y=y};
 
     drawMenuBanner(&banner);
@@ -715,7 +730,15 @@ void drawGame(Game *game) {
 }
 
 void mainLoop() {
-    Game game = initGame();
+    Game game = {.screenHeight=1080.0f, .screenWidth=1920.0f};
+    srand(time(NULL));
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    InitWindow(game.screenWidth, game.screenHeight, "Space Invaders Clone");
+    InitAudioDevice();
+    SetExitKey(KEY_NULL);
+    DisableCursor();
+
+    initGame(&game);
 
     while (game.hotData->gameState != CLOSE) {
         processInput(&game.hotData->input);
@@ -726,4 +749,6 @@ void mainLoop() {
     }
 
     cleanupGame(&game);
+    CloseAudioDevice();
+    CloseWindow();
 }

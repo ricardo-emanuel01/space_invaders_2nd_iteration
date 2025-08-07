@@ -39,7 +39,7 @@ Entity *createListEntities() {
     return leftSentinel;
 }
 
-Entity *createHorde(Entity *lastAlive) {
+Entity *createHorde() {
     const int sizeHorde = 55;
     const int rows = 5;
     const int columns = 11;
@@ -72,9 +72,14 @@ Entity *createHorde(Entity *lastAlive) {
         temp->prev = current;
         current = temp;
     }
-    lastAlive = current;
 
     return leftSentinel;
+}
+
+Entity *findLastAlive(Entity *horde) {
+    Entity *current;
+    for (current = horde->next; current->next->type != LIST_SENTINEL; current = current->next);
+    return current;
 }
 
 void killEnemy(Entity *enemy) {
