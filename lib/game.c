@@ -715,6 +715,18 @@ void drawMenu(Game *game) {
     drawMenuButtons(game, &banner);
 }
 
+void drawEndStatus(Game *game) {
+    char message[9];
+    if (game->hotData->gameState == WIN) {
+        strcpy(message, "VICTORY");
+    } else {
+        strcpy(message, "DEFEATED");
+    }
+
+    float posX = (game->screenWidth - MeasureText(message, 200))/2.0f;
+    DrawText(message, posX, 150.0f, 200, RAYWHITE);
+}
+
 void drawGame(Game *game) {
     ClearBackground(BLACK);
     DrawFPS(10, 10);
@@ -726,6 +738,9 @@ void drawGame(Game *game) {
 
     if (game->hotData->gameState != PLAYING) {
         drawMenu(game);
+        if (game->hotData->gameState == WIN || game->hotData->gameState == LOSE) {
+            drawEndStatus(game);
+        }
     }
 }
 
