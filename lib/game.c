@@ -355,10 +355,6 @@ void updateEnemyShip(Game *game) {
 void updateProjectiles(Game *game, Entity *projectiles) {
     double delta = GetTime() - game->hotData->lastFrameTime;
     Entity *current = projectiles->next;
-    printf("%lf %lf\n\n", current->bounds.height, current->bounds.width);
-    if (current->type == FAST_MOVE || current->type == FAST_SHOT) {
-        printf("UPDATING PWOERUPS\n\n");
-    }
 
     while (current->type != LIST_SENTINEL) {
         if (current->up) {
@@ -486,7 +482,6 @@ void detectCollisions(Game *game) {
                 }
                 if (dropCheck < 100) {
                     generatePowerup(game->powerups, currentEnemy->bounds.x + currentEnemy->bounds.width/2.0f, currentEnemy->bounds.y + currentEnemy->bounds.height);
-                    printf("power up genera\n\n\n");
                 }
                 Entity *temp = currentBullet->prev;
                 killBullet(currentBullet);
@@ -497,7 +492,7 @@ void detectCollisions(Game *game) {
                 if (detectCollision(currentBullet, game->enemyShip)) {
                     dropCheck = rand() % 100;
                     if (dropCheck < 15) {
-                        // generatePowerup(game->powerups, game->enemyShip->bounds.x + game->enemyShip->bounds.width/2.0f, game->enemyShip->bounds.y + game->enemyShip->bounds.height);
+                        generatePowerup(game->powerups, game->enemyShip->bounds.x + game->enemyShip->bounds.width/2.0f, game->enemyShip->bounds.y + game->enemyShip->bounds.height);
                     }
                     Entity *temp = currentBullet->prev;
                     game->hotData->enemyShipActive = false;
@@ -535,10 +530,11 @@ void detectCollisions(Game *game) {
             }
 
             Entity *temp = currentPowerup;
-            currentPowerup = currentPowerup->next;
+            currentPowerup = currentPowerup->prev;
             killPowerup(temp);
             PlaySound(game->sounds->powerup);
         }
+        currentPowerup = currentPowerup->next;
     }
 }
 
