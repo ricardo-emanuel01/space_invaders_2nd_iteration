@@ -17,7 +17,7 @@ ColdGameData *initColdGameData() {
     gameData->enemyShipSpeed = 450.0f;
     gameData->projectileSpeed = 600.0f;
     gameData->powerupDuration = 2.0f;
-    gameData->hordeSpeedIncrease = 100.0f;
+    gameData->hordeSpeedIncrease = 25.0f;
     gameData->hordeStepY = 100.0f;
     gameData->enemyShipSleepTime = 4.0f;
     gameData->alienTimePerFrame = 0.1f;
@@ -40,7 +40,7 @@ ColdGameData *initColdGameData() {
 HotGameData *initHotGameData() {
     HotGameData *gameData = (HotGameData *)malloc(sizeof(HotGameData));
     gameData->lastFrameTime = GetTime();
-    gameData->hordeSpeed = 150.0f;
+    gameData->hordeSpeed = 100.0f;
     gameData->gameState = MENU;
     gameData->menuButton = START;
     gameData->enemyShipGoingLeft = true;
@@ -369,7 +369,7 @@ void updateProjectiles(Game *game, Entity *projectiles) {
             current->bounds.y += game->coldData->projectileSpeed * delta;
         }
 
-        if ((current->bounds.y > game->screenHeight) || (current->bounds.y - current->bounds.height < 0.0f)) {
+        if ((current->bounds.y > game->screenHeight) || (current->bounds.y + current->bounds.height < 0.0f)) {
             Entity *toKill = current;
             current = current->prev;
             killProjectile(toKill);
@@ -490,6 +490,9 @@ void detectCollisions(Game *game) {
                     if (game->hordeLastAlive->type == LIST_SENTINEL) {
                         game->hotData->gameState = WIN;
                         game->hotData->menuButton = RESTART;
+                        killBullet(currentBullet);
+                        killEnemy(currentEnemy);
+                        PlaySound(game->sounds->enemyExplosion);
                         PlaySound(game->sounds->victory);
                         return;
                     }
